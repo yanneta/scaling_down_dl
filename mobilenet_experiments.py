@@ -8,6 +8,9 @@ parser = argparse.ArgumentParser(description='PyTorch MobileNet Training')
 parser.add_argument('--dataset', default='', type=str,
                     help='mura, chexpert or rsna')
 
+args = parser.parse_args()
+dataset = args.dataset
+
 batch_size = 32
 train_loader, valid_loader, valid_dataset = get_dataloaders(dataset, batch_size)
 
