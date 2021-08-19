@@ -54,7 +54,7 @@ for w in widths:
                     dataset=dataset, binary=binary, max_lr=lr, epochs=15)
             counter += 1
             data.append([w, d_s, score, p, t])
-
+            print(dataset, w, d_s, score, p, t)
 
 filename = dataset + "resnet_widths_depths.csv"
 columns = ['width_x', 'depth_x', 'val_score', 'params', 'time_per_epoch']
