@@ -28,6 +28,7 @@ if dataset == "chexpert":
 
 total = len(widths)*len(depths)*3
 data = []
+counter = 0
 for w in widths:
     for d in depths:
         for seed in range(1,4):
@@ -40,6 +41,7 @@ for w in widths:
                                            dataset=dataset, binary=binary, max_lr=lr, epochs=15)
 
             data.append([w, d, score, p, t])
+            counter += 1
             print(dataset, "mobilenet", w, d, score, p, t)
 
 filename = "logs/" + dataset +  "mobilenet_widths_depths.csv"
