@@ -151,7 +151,7 @@ def mura_dataloaders(batch_size):
             x = norm_for_imageNet(x)
 
             y = self.labels[index]
-            y = np.expand_dims(y, axis=-1)
+            #y = np.expand_dims(y, axis=-1)
             return np.rollaxis(x, 2), y
 
         def __len__(self):

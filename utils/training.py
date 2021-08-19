@@ -36,7 +36,7 @@ def train_triangular_policy(model, optimizer, train_dl, valid_dl, valid_dataset,
         train_loss = sum_loss/total
         
         if dataset=='mura':
-            val_loss, val_score = val_metrics_mura(model, valid_dl, valid_dataset)
+            val_loss, val_score = val_metrics_mura(model, valid_dl)
         elif dataset=='rsna':
             val_loss, val_score = val_metrics_rsna(model, valid_dl)
         elif dataset=="chexpert":
@@ -109,16 +109,20 @@ def val_metrics_rsna(model, valid_dl):
 
     return sum_loss/total, auc_score
 
+def compute_auc(probs, ys):
+    probs = np.concatenate(probs)
+    ys = np.concatenate(ys)
+    return metrics.roc_auc_score(ys, probs)
+
 
 ## Mura Dataset
-def val_metrics_mura(model, valid_dl, valid_dataset):
+def val_metrics_mura(model, valid_dl):
 
     model.eval()
     total = 0
     sum_loss = 0
     probs = []
     ys = []
-    weights = torch.Tensor([0.404]).cuda()
 
     for x, y in valid_dl:
         batch = y.shape[0]
@@ -130,16 +134,10 @@ def val_metrics_mura(model, valid_dl, valid_dataset):
         sum_loss += batch*(loss.item())
         total += batch
 
-        probs += list(out.cpu().detach().numpy())
-        ys += list(y.cpu().numpy())
+        probs.append(out.detach().cpu().numpy())
+        ys.append(y.cpu().numpy())
 
-    valid_df = pd.DataFrame()
-    valid_df['name'] = ['_'.join(f[0].split('_')[3:7]) for f in valid_dataset.samples]
-    valid_df['ys'] = ys
-    valid_df['probs'] = probs
-    valid_df = valid_df.groupby('name').mean().reset_index()
-    auc_score = metrics.roc_auc_score(valid_df["ys"], valid_df["probs"])
-
+    auc_score = compute_auc(probs, ys)
     return sum_loss/total, auc_score
 
 
