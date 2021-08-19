@@ -42,7 +42,8 @@ for w in widths:
                     inverted_residual_setting2=d[1]).cuda()
             p = sum(p.numel() for p in model.parameters())
             optimizer = create_optimizer(model, 0.001)
-            score, t = train_triangular_policy(model, optimizer, train_loader, valid_loader, valid_dataset,
+            score, t = train_triangular_policy(model, optimizer,
+                    train_loader, valid_loader, valid_dataset,
                     loss_fn=F.binary_cross_entropy_with_logits, 
                     dataset=dataset, binary=False, max_lr=lr, epochs=15)
         

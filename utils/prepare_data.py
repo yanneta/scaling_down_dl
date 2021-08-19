@@ -88,34 +88,85 @@ def rsna_dataloaders(batch_size):
     return train_loader, valid_loader, valid_ds
 
 
+def crop(im, r, c, target_r, target_c): return im[r:r+target_r, c:c+target_c]
+
+def random_crop(x):
+    """ Returns a random crop"""
+    r, c,*_ = x.shape
+    r, c,*_ = x.shape
+    r_pix = 8
+    c_pix = round(r_pix*c/r)
+    rand_r = random.uniform(0, 1)
+    rand_c = random.uniform(0, 1)
+    start_r = np.floor(2*rand_r*r_pix).astype(int)
+    start_c = np.floor(2*rand_c*c_pix).astype(int)
+    return crop(x, start_r, start_c, r-2*r_pix, c-2*c_pix)
+
+def center_crop(x):
+    r, c,*_ = x.shape
+    r_pix = 8
+    c_pix = round(r_pix*c/r)
+    return crop(x, r_pix, c_pix, r-2*r_pix, c-2*c_pix)
+
+
+def rotate_cv(im, deg, mode=cv2.BORDER_REFLECT, interpolation=cv2.INTER_AREA):
+    """ Rotates an image by deg degrees"""
+    r,c,*_ = im.shape
+    M = cv2.getRotationMatrix2D((c/2,r/2),deg,1)
+    return cv2.warpAffine(im,M,(c,r), borderMode=mode, 
+                          flags=cv2.WARP_FILL_OUTLIERS+interpolation)
+
+def norm_for_imageNet(img):
+    imagenet_stats = np.array([[0.485, 0.456, 0.406], [0.229, 0.224, 0.225]])
+    return (img - imagenet_stats[0])/imagenet_stats[1]
 
 ## Mura dataset
 def mura_dataloaders(batch_size):
-    PATH = Path('/home/rimmanni/data/mura')
-    train_path = PATH/"train_250_200"
-    valid_path = PATH/"valid_250_200"
-    
-    train_dataset = datasets.ImageFolder(
-            train_path,
-            transforms.Compose([
-                transforms.RandomCrop((250,200)),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomRotation(30),
-                transforms.ToTensor()
-#                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-            ]))
+    class MURAXrayDataSet(Dataset):
+        """
+        Basic Images DataSet
+        Args:
+        dataframe with data: image_id, label
+        image_path
+        """
 
+        def __init__(self, df, image_path, transform=False):
+            self.image_id = df["image_id"].values
+            self.labels = df["label"].astype(int).values
+            self.image_path = image_path
+            self.transform = transform
 
-    valid_dataset = datasets.ImageFolder(valid_path, transforms.Compose([
-                transforms.ToTensor()
-#                 transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-            ]))
+        def __getitem__(self, index):
+            image_id = self.image_id[index]
+            path = self.image_path/"image-{}.png".format(image_id)
+            x = cv2.imread(str(path)).astype(np.float32)
+            x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB) / 255
+            if self.transform:
+                rdeg = (np.random.random()-.50)*20
+                x = rotate_cv(x, rdeg)
+                x = random_crop(x)
+                if np.random.random() > 0.5: x = np.fliplr(x).copy()
+            else:
+                x = center_crop(x)
+            x = norm_for_imageNet(x)
+
+            y = self.labels[index]
+            y = np.expand_dims(y, axis=-1)
+            return np.rollaxis(x, 2), y
+
+        def __len__(self):
+            return len(self.image_id)
+
+    PATH = Path('/home/yinterian/yinterian.data2/mura')
+    train = pd.read_csv(PATH/"MURA-v1.1/train_path_labels.csv")
+    valid = pd.read_csv(PATH/"MURA-v1.1/valid_path_labels.csv")
+    train_ds = MURAXrayDataSet(train, PATH/"train_350_270", transform=True)
+    valid_ds = MURAXrayDataSet(valid, PATH/"valid_350_270")
+   
+    train_dl = DataLoader(train_ds, batch_size=batch_size,  shuffle=True)
+    valid_dl = DataLoader(valid_ds, batch_size=batch_size)
     
-    train_loader = DataLoader(train_dataset, batch_size=batch_size,num_workers=4, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=batch_size,num_workers=4)
-    
-    
-    return train_loader, valid_loader, valid_dataset
+    return train_dl, valid_dl, valid_ds
 
 
 #Chexpert Dataset
@@ -126,13 +177,13 @@ class chexpert_dataset(Dataset):
         self.labels[self.labels==-1] = 0
         self.image_path = image_path
         if transform:
-            self.tfms = transforms.Compose([transforms.RandomResizedCrop((256, 256), 
-                                                                         scale= (0.8, 1), ratio=(0.7,1.3)),
-                                            transforms.RandomHorizontalFlip(), 
-                                            transforms.RandomRotation(30),
-                                            transforms.ToTensor(),
-                                            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
-                                           ])
+            self.tfms = transforms.Compose([
+                transforms.RandomResizedCrop(
+                (256, 256), scale= (0.8, 1), ratio=(0.7,1.3)),
+                transforms.RandomHorizontalFlip(), 
+                transforms.RandomRotation(30),
+                transforms.ToTensor(),
+                transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
             
         else:
             self.tfms = transforms.Compose([transforms.ToTensor(), 
